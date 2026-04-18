@@ -125,11 +125,35 @@ function pruneCheckedEntries(checked) {
   return [...preserved, ...cappedSession, ...cappedFiles];
 }
 
+function mergeWithDiskState(state) {
+  const stateFile = getStateFile();
+  try {
+    if (fs.existsSync(stateFile)) {
+      const disk = JSON.parse(fs.readFileSync(stateFile, 'utf8'));
+      if (disk && Array.isArray(disk.checked)) {
+        // Union of checked arrays (deduplicated)
+        const merged = new Set(state.checked);
+        for (const entry of disk.checked) {
+          merged.add(entry);
+        }
+        state.checked = Array.from(merged);
+      }
+      // max() of last_active timestamps
+      if (disk.last_active && disk.last_active > (state.last_active || 0)) {
+        state.last_active = disk.last_active;
+      }
+    }
+  } catch (_) { /* ignore — disk state may be absent or corrupt */ }
+  return state;
+}
+
 function saveState(state) {
   const stateFile = getStateFile();
   let tmpFile = null;
   try {
     state.last_active = Date.now();
+    // Merge with on-disk state to prevent concurrent writers from losing entries
+    mergeWithDiskState(state);
     state.checked = pruneCheckedEntries(state.checked);
     fs.mkdirSync(STATE_DIR, { recursive: true });
     // Atomic write: temp file + rename prevents partial reads

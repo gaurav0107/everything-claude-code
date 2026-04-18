@@ -562,6 +562,69 @@ function runTests() {
     }
   })) passed++; else failed++;
 
+  // --- Test 20: merge-style save preserves concurrent writes (race condition fix) ---
+  clearState();
+  if (test('merge-style save preserves entries written by a concurrent process', () => {
+    // Simulate process A: gate a file so state is written to disk
+    const inputA = {
+      tool_name: 'Edit',
+      tool_input: { file_path: '/src/file-a.js', old_string: 'a', new_string: 'b' }
+    };
+    runHook(inputA); // gates /src/file-a.js — state now has ['/src/file-a.js']
+
+    // Simulate process B writing its own entry directly to disk
+    // (as if a concurrent hook invocation completed between A's load and save)
+    const diskState = JSON.parse(fs.readFileSync(stateFile, 'utf8'));
+    diskState.checked.push('/src/file-b.js');
+    fs.writeFileSync(stateFile, JSON.stringify(diskState), 'utf8');
+
+    // Process A gates another file — its in-memory state does NOT have file-b.js,
+    // but merge-on-save should union them so file-b.js is not lost
+    const inputC = {
+      tool_name: 'Edit',
+      tool_input: { file_path: '/src/file-c.js', old_string: 'a', new_string: 'b' }
+    };
+    runHook(inputC); // gates /src/file-c.js
+
+    const finalState = JSON.parse(fs.readFileSync(stateFile, 'utf8'));
+    assert.ok(finalState.checked.includes('/src/file-a.js'),
+      'file-a.js from process A should be preserved');
+    assert.ok(finalState.checked.includes('/src/file-b.js'),
+      'file-b.js from concurrent process B should be preserved (merge-on-save)');
+    assert.ok(finalState.checked.includes('/src/file-c.js'),
+      'file-c.js from process A second write should be preserved');
+  })) passed++; else failed++;
+
+  // --- Test 21: merge-style save uses max(last_active) ---
+  clearState();
+  if (test('merge-style save uses max of last_active timestamps', () => {
+    // Gate a file so state exists on disk
+    runHook({
+      tool_name: 'Edit',
+      tool_input: { file_path: '/src/ts-a.js', old_string: 'a', new_string: 'b' }
+    });
+
+    // Simulate a concurrent process writing a newer last_active to disk
+    const futureTimestamp = Date.now() + 5000;
+    const diskState = JSON.parse(fs.readFileSync(stateFile, 'utf8'));
+    diskState.last_active = futureTimestamp;
+    fs.writeFileSync(stateFile, JSON.stringify(diskState), 'utf8');
+
+    // Next hook invocation saves — should pick up the larger timestamp from disk
+    runHook({
+      tool_name: 'Edit',
+      tool_input: { file_path: '/src/ts-b.js', old_string: 'a', new_string: 'b' }
+    });
+
+    const finalState = JSON.parse(fs.readFileSync(stateFile, 'utf8'));
+    // The save sets last_active = Date.now() which should be >= futureTimestamp
+    // (since futureTimestamp is only 5s ahead and we just called Date.now())
+    // But more importantly, the merge should not regress to an older timestamp.
+    // We verify the final last_active is at least as large as our future timestamp.
+    assert.ok(finalState.last_active >= futureTimestamp,
+      'last_active should be at least as large as the concurrent write timestamp');
+  })) passed++; else failed++;
+
   // Cleanup only the temp directory created by this test file.
   try {
     if (fs.existsSync(stateDir)) {
