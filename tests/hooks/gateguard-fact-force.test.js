@@ -578,8 +578,9 @@ function runTests() {
     diskState.checked.push('/src/file-b.js');
     fs.writeFileSync(stateFile, JSON.stringify(diskState), 'utf8');
 
-    // Process A gates another file — its in-memory state does NOT have file-b.js,
-    // but merge-on-save should union them so file-b.js is not lost
+    // Process A gates another file — since runHook spawns a new process, its
+    // loadState() *will* see file-b.js from disk, but the merge-on-save must
+    // still produce a correct union without duplicating entries
     const inputC = {
       tool_name: 'Edit',
       tool_input: { file_path: '/src/file-c.js', old_string: 'a', new_string: 'b' }
@@ -593,6 +594,11 @@ function runTests() {
       'file-b.js from concurrent process B should be preserved (merge-on-save)');
     assert.ok(finalState.checked.includes('/src/file-c.js'),
       'file-c.js from process A second write should be preserved');
+
+    // Deduplication: file-a.js must appear exactly once after merge
+    const fileACount = finalState.checked.filter(e => e === '/src/file-a.js').length;
+    assert.strictEqual(fileACount, 1,
+      'file-a.js should appear exactly once (no duplicates from merge)');
   })) passed++; else failed++;
 
   // --- Test 21: merge-style save uses max(last_active) ---
@@ -623,6 +629,32 @@ function runTests() {
     // We verify the final last_active is at least as large as our future timestamp.
     assert.ok(finalState.last_active >= futureTimestamp,
       'last_active should be at least as large as the concurrent write timestamp');
+  })) passed++; else failed++;
+
+  // --- Test 22: corruption resilience — malformed JSON in state file does not crash the hook ---
+  clearState();
+  if (test('survives malformed JSON in state file and saves cleanly', () => {
+    // Write garbage into the state file before the hook runs
+    fs.mkdirSync(stateDir, { recursive: true });
+    fs.writeFileSync(stateFile, '{{{not json at all!!!', 'utf8');
+
+    // The hook should not crash — it should fall back to empty in-memory state
+    const input = {
+      tool_name: 'Edit',
+      tool_input: { file_path: '/src/corrupt-test.js', old_string: 'a', new_string: 'b' }
+    };
+    const result = runHook(input);
+    assert.strictEqual(result.code, 0, 'hook must exit 0 even with corrupt state file');
+    const output = parseOutput(result.stdout);
+    assert.ok(output, 'should produce valid JSON output');
+    assert.strictEqual(output.hookSpecificOutput.permissionDecision, 'deny',
+      'should deny (fresh state after corruption)');
+
+    // After the deny, the state file should be valid JSON written from in-memory state
+    const saved = JSON.parse(fs.readFileSync(stateFile, 'utf8'));
+    assert.ok(Array.isArray(saved.checked), 'saved state should have a valid checked array');
+    assert.ok(saved.checked.includes('/src/corrupt-test.js'),
+      'newly gated file should be in the saved state');
   })) passed++; else failed++;
 
   // Cleanup only the temp directory created by this test file.

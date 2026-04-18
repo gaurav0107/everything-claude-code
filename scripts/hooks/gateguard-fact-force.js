@@ -138,8 +138,8 @@ function mergeWithDiskState(state) {
         }
         state.checked = Array.from(merged);
       }
-      // max() of last_active timestamps
-      if (disk.last_active && disk.last_active > (state.last_active || 0)) {
+      // max() of last_active timestamps (type-safe: only compare actual numbers)
+      if (typeof disk.last_active === 'number' && disk.last_active > (state.last_active || 0)) {
         state.last_active = disk.last_active;
       }
     }
