@@ -562,7 +562,7 @@ function runTests() {
     }
   })) passed++; else failed++;
 
-  // --- Test 20: merge-style save preserves concurrent writes (race condition fix) ---
+  // --- Test 20: merge-style save correctness (serial simulation of diverged state) ---
   clearState();
   if (test('merge-style save preserves entries written by a concurrent process', () => {
     // Simulate process A: gate a file so state is written to disk

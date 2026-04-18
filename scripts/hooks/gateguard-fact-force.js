@@ -152,7 +152,9 @@ function saveState(state) {
   let tmpFile = null;
   try {
     state.last_active = Date.now();
-    // Merge with on-disk state to prevent concurrent writers from losing entries
+    // Best-effort merge: re-read disk state and union entries so concurrent
+    // writers do not overwrite each other. A small TOCTOU window remains between
+    // this re-read and the rename below, acceptable for gate semantics.
     mergeWithDiskState(state);
     state.checked = pruneCheckedEntries(state.checked);
     fs.mkdirSync(STATE_DIR, { recursive: true });
