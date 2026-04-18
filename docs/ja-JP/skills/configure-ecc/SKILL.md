@@ -133,19 +133,14 @@ Options:
 選択された各スキルについて、スキルディレクトリ全体をコピーします。ソースパスはスキルがコアかニッチかによって異なります：
 
 ```bash
-# コアスキル（ステップ 2a で記載）は .agents/skills/ 以下にあります
+# コアスキル（`.agents/skills/` 配下）
 cp -r "$ECC_ROOT/.agents/skills/<skill-name>" "$TARGET/skills/"
 
-# ニッチスキル（ステップ 2b で記載）は skills/ 以下にあります
+# ニッチスキル（`skills/` 配下）
 cp -r "$ECC_ROOT/skills/<skill-name>" "$TARGET/skills/"
 ```
 
-> **警告（macOS / BSD cp）：** ソースパスの末尾にスラッシュを含めないでください。
-> `cp -r src/` は `src` の*内容*をコピー先にコピーしますが、`cp -r src` はディレクトリ自体をコピーします。
-> glob で反復する場合は、末尾のスラッシュを除去する防御的な形式を使用してください：
-> ```bash
-> cp -r "${src%/}" "$TARGET/skills/$(basename "$src")"
-> ```
+> **注意:** BSD cp がディレクトリではなく内容をコピーしないよう、ソースパスの末尾スラッシュを省略してください。
 
 注: `continuous-learning` と `continuous-learning-v2` には追加ファイル（config.json、フック、スクリプト）があります — SKILL.md だけでなく、ディレクトリ全体がコピーされることを確認してください。
 

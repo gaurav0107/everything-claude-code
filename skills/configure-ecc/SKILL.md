@@ -204,12 +204,7 @@ cp -r "$ECC_ROOT/.agents/skills/<skill-name>" "$TARGET/skills/"
 cp -r "$ECC_ROOT/skills/<skill-name>" "$TARGET/skills/"
 ```
 
-> **Warning (macOS / BSD cp):** Do NOT include a trailing slash on the source path.
-> `cp -r src/` copies the *contents* of `src` into the destination, while `cp -r src` copies the directory itself.
-> When iterating with a glob, use the defensive form to strip any trailing slash:
-> ```bash
-> cp -r "${src%/}" "$TARGET/skills/$(basename "$src")"
-> ```
+> **Note:** Omit trailing slashes on source paths — BSD `cp -r src/` copies contents, while `cp -r src` copies the directory itself.
 
 Note: `continuous-learning` and `continuous-learning-v2` have extra files (config.json, hooks, scripts) — ensure the entire directory is copied, not just SKILL.md.
 

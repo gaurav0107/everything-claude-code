@@ -208,12 +208,7 @@ cp -r "$ECC_ROOT/.agents/skills/<skill-name>" "$TARGET/skills/"
 cp -r "$ECC_ROOT/skills/<skill-name>" "$TARGET/skills/"
 ```
 
-> **警告（macOS / BSD cp）：** 源路径末尾不要包含斜杠。
-> `cp -r src/` 会将 `src` 的*内容*复制到目标目录，而 `cp -r src` 会复制目录本身。
-> 在使用 glob 迭代时，使用防御性写法去除尾部斜杠：
-> ```bash
-> cp -r "${src%/}" "$TARGET/skills/$(basename "$src")"
-> ```
+> **注意：** 源路径末尾不要包含斜杠 — BSD `cp -r src/` 会复制内容，而 `cp -r src` 会复制目录本身。
 
 注意：`continuous-learning` 和 `continuous-learning-v2` 有额外的文件（config.json、钩子、脚本）——确保复制整个目录，而不仅仅是 SKILL.md。
 
