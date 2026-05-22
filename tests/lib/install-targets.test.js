@@ -1025,6 +1025,29 @@ function runTests() {
     }
   })) passed++; else failed++;
 
+  if (test('opencode adapter validate rejects wrong artefact type (file where directory expected)', () => {
+    const adapter = getInstallTargetAdapter('opencode');
+    const repoRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'install-targets-opencode-wrongtype-'));
+    try {
+      const distDir = path.join(repoRoot, '.opencode', 'dist');
+      fs.mkdirSync(distDir, { recursive: true });
+      fs.writeFileSync(path.join(distDir, 'index.js'), '// stub\n');
+      // Materialize plugins/tools as files instead of directories.
+      fs.writeFileSync(path.join(distDir, 'plugins'), 'not-a-dir');
+      fs.writeFileSync(path.join(distDir, 'tools'), 'not-a-dir');
+
+      const issues = adapter.validate({ homeDir: '/Users/example', repoRoot });
+      assert.strictEqual(issues.length, 1, 'Wrong-type artefacts should still surface a validation issue');
+      assert.strictEqual(issues[0].code, 'opencode-plugin-not-built');
+      const missing = issues[0].missingRelativePaths.map(p => p.replace(/\\/g, '/'));
+      assert.ok(missing.includes('.opencode/dist/plugins'), 'Should flag plugins file as wrong type');
+      assert.ok(missing.includes('.opencode/dist/tools'), 'Should flag tools file as wrong type');
+      assert.ok(!missing.includes('.opencode/dist/index.js'), 'Should not flag index.js when it is correctly a file');
+    } finally {
+      fs.rmSync(repoRoot, { recursive: true, force: true });
+    }
+  })) passed++; else failed++;
+
   if (test('opencode adapter validate passes once compiled plugin payload exists', () => {
     const adapter = getInstallTargetAdapter('opencode');
     const repoRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'install-targets-opencode-built-'));

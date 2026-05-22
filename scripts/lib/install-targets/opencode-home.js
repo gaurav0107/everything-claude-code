@@ -8,12 +8,25 @@ const {
 } = require('./helpers');
 
 const COMPILED_PLUGIN_DIST_DIR = path.join('.opencode', 'dist');
-const REQUIRED_COMPILED_RELATIVE_PATHS = Object.freeze([
-  path.join(COMPILED_PLUGIN_DIST_DIR, 'index.js'),
-  path.join(COMPILED_PLUGIN_DIST_DIR, 'plugins'),
-  path.join(COMPILED_PLUGIN_DIST_DIR, 'tools'),
+const REQUIRED_COMPILED_ARTEFACTS = Object.freeze([
+  { relativePath: path.join(COMPILED_PLUGIN_DIST_DIR, 'index.js'), expectedType: 'file' },
+  { relativePath: path.join(COMPILED_PLUGIN_DIST_DIR, 'plugins'), expectedType: 'directory' },
+  { relativePath: path.join(COMPILED_PLUGIN_DIST_DIR, 'tools'), expectedType: 'directory' },
 ]);
 const BUILD_COMMAND_HINT = 'node scripts/build-opencode.js (or: npm run build:opencode)';
+
+function isExpectedType(absolutePath, expectedType) {
+  let stat;
+  try {
+    stat = fs.statSync(absolutePath);
+  } catch (error) {
+    if (error && error.code === 'ENOENT') {
+      return false;
+    }
+    throw error;
+  }
+  return expectedType === 'file' ? stat.isFile() : stat.isDirectory();
+}
 
 function defaultValidateOpencodeHome(input = {}) {
   if (!input.homeDir && !os.homedir()) {
@@ -30,12 +43,13 @@ function defaultValidateOpencodeHome(input = {}) {
     return [];
   }
 
-  const missingPaths = REQUIRED_COMPILED_RELATIVE_PATHS
-    .map(relativePath => ({
-      relativePath,
-      absolutePath: path.join(input.repoRoot, relativePath),
+  const missingPaths = REQUIRED_COMPILED_ARTEFACTS
+    .map(artefact => ({
+      relativePath: artefact.relativePath,
+      absolutePath: path.join(input.repoRoot, artefact.relativePath),
+      expectedType: artefact.expectedType,
     }))
-    .filter(entry => !fs.existsSync(entry.absolutePath));
+    .filter(entry => !isExpectedType(entry.absolutePath, entry.expectedType));
 
   if (missingPaths.length > 0) {
     const missingList = missingPaths.map(entry => entry.relativePath).join(', ');
@@ -44,12 +58,14 @@ function defaultValidateOpencodeHome(input = {}) {
         'error',
         'opencode-plugin-not-built',
         'OpenCode install requires the compiled plugin payload under '
-          + `${COMPILED_PLUGIN_DIST_DIR}, but the following artefact(s) were not found: `
-          + `${missingList}. Run ${BUILD_COMMAND_HINT} from the repo root before `
-          + 're-running the installer.',
+          + `${COMPILED_PLUGIN_DIST_DIR}, but the following artefact(s) were `
+          + `missing or had the wrong type: ${missingList}. Run `
+          + `${BUILD_COMMAND_HINT} from the repo root before re-running the `
+          + 'installer.',
         {
           missingPaths: missingPaths.map(entry => entry.absolutePath),
           missingRelativePaths: missingPaths.map(entry => entry.relativePath),
+          expectedTypes: missingPaths.map(entry => entry.expectedType),
         }
       ),
     ];
