@@ -7,7 +7,12 @@ const {
   createInstallTargetAdapter,
 } = require('./helpers');
 
-const COMPILED_PLUGIN_RELATIVE_PATH = path.join('.opencode', 'dist', 'index.js');
+const COMPILED_PLUGIN_DIST_DIR = path.join('.opencode', 'dist');
+const REQUIRED_COMPILED_RELATIVE_PATHS = Object.freeze([
+  path.join(COMPILED_PLUGIN_DIST_DIR, 'index.js'),
+  path.join(COMPILED_PLUGIN_DIST_DIR, 'plugins'),
+  path.join(COMPILED_PLUGIN_DIST_DIR, 'tools'),
+]);
 const BUILD_COMMAND_HINT = 'node scripts/build-opencode.js (or: npm run build:opencode)';
 
 function defaultValidateOpencodeHome(input = {}) {
@@ -25,16 +30,27 @@ function defaultValidateOpencodeHome(input = {}) {
     return [];
   }
 
-  const compiledPluginPath = path.join(input.repoRoot, COMPILED_PLUGIN_RELATIVE_PATH);
-  if (!fs.existsSync(compiledPluginPath)) {
+  const missingPaths = REQUIRED_COMPILED_RELATIVE_PATHS
+    .map(relativePath => ({
+      relativePath,
+      absolutePath: path.join(input.repoRoot, relativePath),
+    }))
+    .filter(entry => !fs.existsSync(entry.absolutePath));
+
+  if (missingPaths.length > 0) {
+    const missingList = missingPaths.map(entry => entry.relativePath).join(', ');
     return [
       buildValidationIssue(
         'error',
         'opencode-plugin-not-built',
-        'OpenCode install requires the compiled plugin payload at '
-          + `${COMPILED_PLUGIN_RELATIVE_PATH}, but it was not found. Run `
-          + `${BUILD_COMMAND_HINT} from the repo root before re-running the installer.`,
-        { compiledPluginPath }
+        'OpenCode install requires the compiled plugin payload under '
+          + `${COMPILED_PLUGIN_DIST_DIR}, but the following artefact(s) were not found: `
+          + `${missingList}. Run ${BUILD_COMMAND_HINT} from the repo root before `
+          + 're-running the installer.',
+        {
+          missingPaths: missingPaths.map(entry => entry.absolutePath),
+          missingRelativePaths: missingPaths.map(entry => entry.relativePath),
+        }
       ),
     ];
   }

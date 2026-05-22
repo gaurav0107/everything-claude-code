@@ -990,13 +990,36 @@ function runTests() {
       assert.strictEqual(issues[0].severity, 'error');
       assert.strictEqual(issues[0].code, 'opencode-plugin-not-built');
       assert.ok(
-        issues[0].message.includes('.opencode/dist/index.js') || issues[0].message.includes('.opencode\\dist\\index.js'),
-        'Validation message should reference the missing compiled plugin path'
+        issues[0].message.includes('.opencode/dist') || issues[0].message.includes('.opencode\\dist'),
+        'Validation message should reference the .opencode/dist payload location'
       );
       assert.ok(
         issues[0].message.includes('build-opencode.js') || issues[0].message.includes('build:opencode'),
         'Validation message should hint at the build command'
       );
+      assert.ok(Array.isArray(issues[0].missingRelativePaths) && issues[0].missingRelativePaths.length >= 1,
+        'Validation issue should expose the list of missing artefacts as metadata');
+    } finally {
+      fs.rmSync(repoRoot, { recursive: true, force: true });
+    }
+  })) passed++; else failed++;
+
+  if (test('opencode adapter validate reports a partial build (entry present, runtime dirs absent)', () => {
+    const adapter = getInstallTargetAdapter('opencode');
+    const repoRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'install-targets-opencode-partial-'));
+    try {
+      const distDir = path.join(repoRoot, '.opencode', 'dist');
+      fs.mkdirSync(distDir, { recursive: true });
+      fs.writeFileSync(path.join(distDir, 'index.js'), '// stub\n');
+      // Intentionally omit dist/plugins and dist/tools.
+
+      const issues = adapter.validate({ homeDir: '/Users/example', repoRoot });
+      assert.strictEqual(issues.length, 1, 'Should surface a single validation issue for partial builds');
+      assert.strictEqual(issues[0].code, 'opencode-plugin-not-built');
+      const missing = issues[0].missingRelativePaths.map(p => p.replace(/\\/g, '/'));
+      assert.ok(missing.includes('.opencode/dist/plugins'), 'Missing list should include dist/plugins');
+      assert.ok(missing.includes('.opencode/dist/tools'), 'Missing list should include dist/tools');
+      assert.ok(!missing.includes('.opencode/dist/index.js'), 'Missing list should not include the present entry');
     } finally {
       fs.rmSync(repoRoot, { recursive: true, force: true });
     }
@@ -1007,7 +1030,8 @@ function runTests() {
     const repoRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'install-targets-opencode-built-'));
     try {
       const distDir = path.join(repoRoot, '.opencode', 'dist');
-      fs.mkdirSync(distDir, { recursive: true });
+      fs.mkdirSync(path.join(distDir, 'plugins'), { recursive: true });
+      fs.mkdirSync(path.join(distDir, 'tools'), { recursive: true });
       fs.writeFileSync(path.join(distDir, 'index.js'), '// stub\n');
 
       const issues = adapter.validate({ homeDir: '/Users/example', repoRoot });
