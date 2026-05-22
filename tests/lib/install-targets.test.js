@@ -1048,6 +1048,36 @@ function runTests() {
     }
   })) passed++; else failed++;
 
+  if (test('opencode adapter validate handles ENOTDIR (intermediate path is a file) without throwing', () => {
+    const adapter = getInstallTargetAdapter('opencode');
+    const repoRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'install-targets-opencode-enotdir-'));
+    try {
+      // Create `.opencode/dist` as a regular file. Stat'ing
+      // `.opencode/dist/index.js` then throws ENOTDIR (intermediate component
+      // is a file, not a directory). The validate gate must treat this as a
+      // missing artefact and surface the structured opencode-plugin-not-built
+      // issue, not propagate the raw fs error.
+      const opencodeDir = path.join(repoRoot, '.opencode');
+      fs.mkdirSync(opencodeDir, { recursive: true });
+      fs.writeFileSync(path.join(opencodeDir, 'dist'), 'not-a-dir');
+
+      let issues;
+      assert.doesNotThrow(
+        () => { issues = adapter.validate({ homeDir: '/Users/example', repoRoot }); },
+        'validate should swallow ENOTDIR and surface a structured issue'
+      );
+      assert.strictEqual(issues.length, 1, 'ENOTDIR case should produce exactly one validation issue');
+      assert.strictEqual(issues[0].severity, 'error');
+      assert.strictEqual(issues[0].code, 'opencode-plugin-not-built');
+      const missing = issues[0].missingRelativePaths.map(p => p.replace(/\\/g, '/'));
+      assert.ok(missing.includes('.opencode/dist/index.js'), 'ENOTDIR target should be reported as missing');
+      assert.ok(missing.includes('.opencode/dist/plugins'), 'Sibling artefacts under the bad path should be reported');
+      assert.ok(missing.includes('.opencode/dist/tools'), 'Sibling artefacts under the bad path should be reported');
+    } finally {
+      fs.rmSync(repoRoot, { recursive: true, force: true });
+    }
+  })) passed++; else failed++;
+
   if (test('opencode adapter validate passes once compiled plugin payload exists', () => {
     const adapter = getInstallTargetAdapter('opencode');
     const repoRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'install-targets-opencode-built-'));

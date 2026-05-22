@@ -15,12 +15,17 @@ const REQUIRED_COMPILED_ARTEFACTS = Object.freeze([
 ]);
 const BUILD_COMMAND_HINT = 'node scripts/build-opencode.js (or: npm run build:opencode)';
 
+// Errors that mean "this artefact does not exist at the expected path / type".
+// Anything else (EACCES, EIO, ...) is a genuine system fault we surface to the
+// caller rather than masking as a missing artefact.
+const MISSING_ARTEFACT_ERROR_CODES = new Set(['ENOENT', 'ENOTDIR']);
+
 function isExpectedType(absolutePath, expectedType) {
   let stat;
   try {
     stat = fs.statSync(absolutePath);
   } catch (error) {
-    if (error && error.code === 'ENOENT') {
+    if (error && MISSING_ARTEFACT_ERROR_CODES.has(error.code)) {
       return false;
     }
     throw error;
