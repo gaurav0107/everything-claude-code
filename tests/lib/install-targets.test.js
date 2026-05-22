@@ -3,6 +3,8 @@
  */
 
 const assert = require('assert');
+const fs = require('fs');
+const os = require('os');
 const path = require('path');
 
 const {
@@ -964,6 +966,55 @@ function runTests() {
       )),
       'Should skip foreign Zed platform paths'
     );
+  })) passed++; else failed++;
+
+  if (test('resolves opencode adapter root and install-state path from home dir', () => {
+    const adapter = getInstallTargetAdapter('opencode');
+    const homeDir = '/Users/example';
+    const root = adapter.resolveRoot({ homeDir });
+    const statePath = adapter.getInstallStatePath({ homeDir });
+
+    assert.strictEqual(adapter.id, 'opencode-home');
+    assert.strictEqual(adapter.target, 'opencode');
+    assert.strictEqual(adapter.kind, 'home');
+    assert.strictEqual(root, path.join(homeDir, '.opencode'));
+    assert.strictEqual(statePath, path.join(homeDir, '.opencode', 'ecc-install-state.json'));
+  })) passed++; else failed++;
+
+  if (test('opencode adapter validate reports an error when compiled plugin is missing', () => {
+    const adapter = getInstallTargetAdapter('opencode');
+    const repoRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'install-targets-opencode-missing-'));
+    try {
+      const issues = adapter.validate({ homeDir: '/Users/example', repoRoot });
+      assert.strictEqual(issues.length, 1, 'Should surface exactly one validation issue');
+      assert.strictEqual(issues[0].severity, 'error');
+      assert.strictEqual(issues[0].code, 'opencode-plugin-not-built');
+      assert.ok(
+        issues[0].message.includes('.opencode/dist/index.js') || issues[0].message.includes('.opencode\\dist\\index.js'),
+        'Validation message should reference the missing compiled plugin path'
+      );
+      assert.ok(
+        issues[0].message.includes('build-opencode.js') || issues[0].message.includes('build:opencode'),
+        'Validation message should hint at the build command'
+      );
+    } finally {
+      fs.rmSync(repoRoot, { recursive: true, force: true });
+    }
+  })) passed++; else failed++;
+
+  if (test('opencode adapter validate passes once compiled plugin payload exists', () => {
+    const adapter = getInstallTargetAdapter('opencode');
+    const repoRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'install-targets-opencode-built-'));
+    try {
+      const distDir = path.join(repoRoot, '.opencode', 'dist');
+      fs.mkdirSync(distDir, { recursive: true });
+      fs.writeFileSync(path.join(distDir, 'index.js'), '// stub\n');
+
+      const issues = adapter.validate({ homeDir: '/Users/example', repoRoot });
+      assert.deepStrictEqual(issues, [], 'Should not surface validation issues when plugin is built');
+    } finally {
+      fs.rmSync(repoRoot, { recursive: true, force: true });
+    }
   })) passed++; else failed++;
 
   console.log(`\nResults: Passed: ${passed}, Failed: ${failed}`);
