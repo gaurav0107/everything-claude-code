@@ -1567,6 +1567,57 @@ function runTests() {
       'custom phrase inside command substitution should be gated');
   })) passed++; else failed++;
 
+  // --- Issue #2078 review fix: warning emitted once per *distinct*
+  // invalid regex, not once per process. Verifies the same-process
+  // path that the reviewers (CodeRabbit + cubic) flagged.
+  clearState();
+  if (test('GATEGUARD_BASH_EXTRA_DESTRUCTIVE warns once per distinct invalid regex (not once per process)', () => {
+    // We can't easily intercept stderr from a spawnSync child without
+    // re-running the hook in the same process, so we exercise
+    // checkCommand-equivalent behavior via a same-process require.
+    const originalEnv = process.env.GATEGUARD_BASH_EXTRA_DESTRUCTIVE;
+    const originalStderrWrite = process.stderr.write.bind(process.stderr);
+    const captured = [];
+    process.stderr.write = (chunk) => {
+      const s = typeof chunk === 'string' ? chunk : chunk.toString();
+      if (s.includes('GATEGUARD_BASH_EXTRA_DESTRUCTIVE')) {
+        captured.push(s.trim());
+      }
+      // Don't forward to real stderr — keeps test output clean.
+      return true;
+    };
+    try {
+      // First bad pattern — should warn once.
+      process.env.GATEGUARD_BASH_EXTRA_DESTRUCTIVE = '(unclosed-a';
+      const hook1 = loadDirectHook({ GATEGUARD_BASH_EXTRA_DESTRUCTIVE: '(unclosed-a' });
+      hook1.run(JSON.stringify({ tool_name: 'Bash', tool_input: { command: 'ls' } }));
+      hook1.run(JSON.stringify({ tool_name: 'Bash', tool_input: { command: 'ls' } }));
+      assert.strictEqual(captured.length, 1,
+        `same invalid pattern should warn exactly once, got ${captured.length}: ${JSON.stringify(captured)}`);
+
+      // Switch to a *different* bad pattern — should warn again (this is
+      // the bug both reviewers flagged: the sticky flag was never reset
+      // when the cache key changed).
+      process.env.GATEGUARD_BASH_EXTRA_DESTRUCTIVE = '(unclosed-b';
+      hook1.run(JSON.stringify({ tool_name: 'Bash', tool_input: { command: 'ls' } }));
+      assert.strictEqual(captured.length, 2,
+        `distinct invalid pattern should produce a second warning, got ${captured.length}: ${JSON.stringify(captured)}`);
+
+      // Switch back to a valid regex — no extra warning.
+      process.env.GATEGUARD_BASH_EXTRA_DESTRUCTIVE = 'valid\\s+pattern';
+      hook1.run(JSON.stringify({ tool_name: 'Bash', tool_input: { command: 'ls' } }));
+      assert.strictEqual(captured.length, 2,
+        `valid regex should not emit a warning, got ${captured.length}: ${JSON.stringify(captured)}`);
+    } finally {
+      process.stderr.write = originalStderrWrite;
+      if (originalEnv === undefined) {
+        delete process.env.GATEGUARD_BASH_EXTRA_DESTRUCTIVE;
+      } else {
+        process.env.GATEGUARD_BASH_EXTRA_DESTRUCTIVE = originalEnv;
+      }
+    }
+  })) passed++; else failed++;
+
   // Cleanup only the temp directory created by this test file.
   try {
     if (fs.existsSync(stateDir)) {

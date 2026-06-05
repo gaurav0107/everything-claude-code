@@ -76,10 +76,14 @@ function getExtraDestructiveRegex() {
   if (raw === extraDestructiveCacheKey) {
     return extraDestructiveCacheRegex;
   }
+  // The env value just changed; reset the once-per-pattern warning gate
+  // so a subsequent *different* invalid regex is also reported once. The
+  // previous shape kept the flag sticky and silently swallowed the
+  // second bad pattern in a long-running process.
   extraDestructiveCacheKey = raw;
+  extraDestructiveWarnLogged = false;
   try {
     extraDestructiveCacheRegex = new RegExp(raw, 'i');
-    extraDestructiveWarnLogged = false;
   } catch (err) {
     extraDestructiveCacheRegex = null;
     if (!extraDestructiveWarnLogged) {
