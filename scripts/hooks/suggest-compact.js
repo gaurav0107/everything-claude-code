@@ -75,7 +75,11 @@ function cleanupOldCounters(tempDir, retentionDays, currentCounterFile) {
       continue;
     }
 
-    if (stats.mtimeMs > cutoffMs) continue;
+    // Strict "older than" semantics per the docstring: a file whose mtime
+    // sits exactly on the cutoff boundary has age == retentionDays, which
+    // is not *older than* retentionDays, so preserve it. Use >= so only
+    // strictly older files (mtimeMs < cutoffMs) fall through to deletion.
+    if (stats.mtimeMs >= cutoffMs) continue;
 
     try {
       fs.rmSync(fullPath, { force: true });

@@ -579,6 +579,38 @@ function runTests() {
   })) passed++;
   else failed++;
 
+  if (test('preserves files whose mtime sits at or after the TTL cutoff', () => {
+    // Contract: docstring says files "older than" retentionDays are removed.
+    // A file at the exact boundary (age == retentionDays) is NOT older than
+    // retentionDays, so it must survive the sweep. Pins the >= comparison
+    // in cleanupOldCounters: anything with mtimeMs >= cutoffMs is skipped.
+    //
+    // We can't pin the boundary by clock — the sweep computes its own
+    // Date.now() after this test runs, so `setMtimeDaysAgo(file, 14)` is
+    // effectively "14d + handful of ms", placing the file just past the
+    // cutoff. To exercise the boundary deterministically, set the file's
+    // mtime two seconds *newer* than the projected cutoff: with `>` the
+    // file would be deleted (mtimeMs > cutoffMs is false at the cutoff
+    // edge); with `>=` it survives.
+    const { sessionId, cleanup } = createCounterContext();
+    const boundary = getCounterFilePath(`boundary-${Date.now()}`);
+    fs.writeFileSync(boundary, '1');
+    const retentionDays = 14;
+    const boundaryMs = Date.now() - retentionDays * 24 * 60 * 60 * 1000 + 2000;
+    const sec = Math.floor(boundaryMs / 1000);
+    fs.utimesSync(boundary, sec, sec);
+    try {
+      const result = runCompact({ CLAUDE_SESSION_ID: sessionId });
+      assert.strictEqual(result.code, 0);
+      assert.ok(fs.existsSync(boundary),
+        `Boundary-aged counter file should be preserved. Path: ${boundary}`);
+    } finally {
+      try { fs.unlinkSync(boundary); } catch (_err) { /* ignore */ }
+      cleanup();
+    }
+  })) passed++;
+  else failed++;
+
   if (test('exit 0 holds when sweep encounters a populated temp dir', () => {
     // Functional smoke: with a mix of stale, fresh, and unrelated files
     // present, the hook must still exit 0 — the always-exit-0 contract
