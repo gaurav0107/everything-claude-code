@@ -22,6 +22,14 @@
 
 'use strict';
 
+// migrate-homunculus.sh and this test's assertions rely on POSIX bash, sed, and
+// grep -E semantics. Skip on Windows, matching the repo convention for
+// bash-dependent clv2 tests (see tests/hooks/observe-subdirectory-detection.test.js).
+if (process.platform === 'win32') {
+  console.log('Skipping bash-dependent migrate-homunculus tests on Windows');
+  process.exit(0);
+}
+
 const assert = require('assert');
 const fs = require('fs');
 const path = require('path');
