@@ -181,8 +181,10 @@ timeoutHandlers.forEach((handler, idx) => {
   test(`real _ecc_bail timeout handler #${idx + 1}: SIGALRM fire emits stderr token and exits 0`, () => {
     const python = findPython();
     if (!python) {
-      console.log('  (skipped: no python interpreter available)');
-      return;
+      // Fail fast rather than returning (which the harness would record as a
+      // PASS): a missing interpreter means the SIGALRM contract went
+      // unverified, which must not look like a green regression test.
+      throw new Error('python3 interpreter not available; the SIGALRM regression cannot be verified');
     }
 
     const result = runHandlerTimeout(python, handler);
