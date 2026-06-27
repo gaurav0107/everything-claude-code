@@ -1060,7 +1060,10 @@ def test_update_registry_matches_shell_schema(patch_globals):
     assert entry["name"] == "demo"
     assert entry["root"] == "/repo"
     assert entry["remote"] == "https://example.com/repo.git"
-    assert entry["created_at"] and entry["last_seen"]
+    # On the initial write both timestamps come from the same `now`, so the
+    # first-write contract is created_at == last_seen.
+    assert entry["created_at"]
+    assert entry["created_at"] == entry["last_seen"]
 
 
 def test_update_registry_preserves_created_at(patch_globals):
@@ -1089,7 +1092,8 @@ def test_update_registry_heals_malformed_entry(patch_globals):
     entry = json.loads(tree["registry_file"].read_text())["abc123"]
     assert isinstance(entry, dict)
     assert entry["id"] == "abc123"
-    assert entry["created_at"] and entry["last_seen"]
+    assert entry["created_at"]
+    assert entry["created_at"] == entry["last_seen"]
 
 
 def test_write_registry_atomic_no_tmp_leftovers(patch_globals):
