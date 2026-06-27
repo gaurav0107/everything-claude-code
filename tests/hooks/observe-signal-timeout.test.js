@@ -100,10 +100,22 @@ function extractHandlers(src) {
 
 const handlers = extractHandlers(observeSrc);
 
-test('observe.sh defines at least two _ecc_bail handlers', () => {
+// The #2300 timeout handlers are the ones that log the `[observe] SIGALRM
+// timeout` marker. Selecting by marker (rather than by array index) keeps the
+// behavioral check pinned to the timeout handlers even if an unrelated
+// `_ecc_bail` is ever added elsewhere in observe.sh.
+const timeoutHandlers = handlers.filter(body =>
+  body.includes('[observe] SIGALRM timeout')
+);
+
+test('observe.sh defines at least two _ecc_bail timeout handlers', () => {
   assert.ok(
     handlers.length >= 2,
     `expected >= 2 _ecc_bail handlers, found ${handlers.length}`
+  );
+  assert.ok(
+    timeoutHandlers.length >= 2,
+    `expected >= 2 handlers carrying the [observe] SIGALRM timeout marker, found ${timeoutHandlers.length}`
   );
 });
 
@@ -160,13 +172,13 @@ function runHandlerTimeout(python, handler) {
   });
 }
 
-// Exercise EVERY handler end-to-end, not just handlers[0]. The main
-// observation-write path (handlers[1]) is the higher-value one to verify:
-// it carries valid, parseable data that would succeed given more time, so a
-// silent drop there is the worst case. A behavioral check on only the first
-// handler would not catch a regression that silenced the second one.
-handlers.forEach((handler, idx) => {
-  test(`real _ecc_bail handler #${idx + 1}: SIGALRM fire emits stderr token and exits 0`, () => {
+// Exercise EVERY timeout handler end-to-end, not just the first. The main
+// observation-write path is the higher-value one to verify: it carries valid,
+// parseable data that would succeed given more time, so a silent drop there is
+// the worst case. A behavioral check on only one handler would not catch a
+// regression that silenced another.
+timeoutHandlers.forEach((handler, idx) => {
+  test(`real _ecc_bail timeout handler #${idx + 1}: SIGALRM fire emits stderr token and exits 0`, () => {
     const python = findPython();
     if (!python) {
       console.log('  (skipped: no python interpreter available)');
