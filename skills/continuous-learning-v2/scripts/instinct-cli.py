@@ -438,6 +438,12 @@ def _update_registry(pid: str, pname: str, proot: str, premote: str) -> None:
         # existing entry; only "last_seen" advances on update.
         now = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
         existing = registry.get(pid, {})
+        # A malformed registry (e.g. a non-dict value for this id) must not
+        # crash the update: fall back to an empty dict so the corrupt entry is
+        # healed by the rewrite, matching the old unconditional-overwrite
+        # behavior.
+        if not isinstance(existing, dict):
+            existing = {}
         registry[pid] = {
             "id": pid,
             "name": pname,
