@@ -430,6 +430,11 @@ def _update_registry(pid: str, pname: str, proot: str, premote: str) -> None:
                 registry = json.load(f)
         except (FileNotFoundError, json.JSONDecodeError):
             registry = {}
+        # A registry that is valid JSON but not a mapping (e.g. a list from a
+        # corrupt projects.json) must not crash the update before the per-entry
+        # guard below: fall back to an empty dict so the whole file is healed.
+        if not isinstance(registry, dict):
+            registry = {}
 
         # Mirror the shell counterpart in detect-project.sh: the entry carries
         # "id" and "created_at" alongside the other fields so a projects.json
