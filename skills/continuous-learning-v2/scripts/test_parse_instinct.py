@@ -1047,6 +1047,38 @@ def test_update_registry_atomic_replaces_file(patch_globals):
     assert leftovers == []
 
 
+def test_update_registry_matches_shell_schema(patch_globals):
+    # Issue #2299: the Python writer must emit the same field set as the shell
+    # counterpart in detect-project.sh (id, name, root, remote, created_at,
+    # last_seen) so a projects.json entry has a consistent shape regardless of
+    # which path wrote it.
+    tree = patch_globals
+    _update_registry("abc123", "demo", "/repo", "https://example.com/repo.git")
+    entry = json.loads(tree["registry_file"].read_text())["abc123"]
+    assert set(entry) == {"id", "name", "root", "remote", "created_at", "last_seen"}
+    assert entry["id"] == "abc123"
+    assert entry["name"] == "demo"
+    assert entry["root"] == "/repo"
+    assert entry["remote"] == "https://example.com/repo.git"
+    assert entry["created_at"] and entry["last_seen"]
+
+
+def test_update_registry_preserves_created_at(patch_globals):
+    # created_at is stamped on first write and preserved on subsequent updates,
+    # while last_seen advances — matching entry.get("created_at", now) in the
+    # shell counterpart.
+    tree = patch_globals
+    _update_registry("abc123", "demo", "/repo", "https://example.com/repo.git")
+    first = json.loads(tree["registry_file"].read_text())["abc123"]
+
+    _update_registry("abc123", "demo-renamed", "/repo", "https://example.com/repo.git")
+    second = json.loads(tree["registry_file"].read_text())["abc123"]
+
+    assert second["created_at"] == first["created_at"]
+    assert second["name"] == "demo-renamed"
+    assert second["last_seen"] >= first["last_seen"]
+
+
 def test_write_registry_atomic_no_tmp_leftovers(patch_globals):
     # Issue #2294: _write_registry now holds the registry lock like
     # _update_registry. It must still write atomically with no stray tmp files.

@@ -431,11 +431,20 @@ def _update_registry(pid: str, pname: str, proot: str, premote: str) -> None:
         except (FileNotFoundError, json.JSONDecodeError):
             registry = {}
 
+        # Mirror the shell counterpart in detect-project.sh: the entry carries
+        # "id" and "created_at" alongside the other fields so a projects.json
+        # record has the same shape regardless of which path (Python CLI or
+        # shell hook) last wrote it. "created_at" is preserved from any
+        # existing entry; only "last_seen" advances on update.
+        now = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+        existing = registry.get(pid, {})
         registry[pid] = {
+            "id": pid,
             "name": pname,
             "root": proot,
             "remote": premote,
-            "last_seen": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
+            "created_at": existing.get("created_at", now),
+            "last_seen": now,
         }
 
         tmp_file = REGISTRY_FILE.parent / f".{REGISTRY_FILE.name}.tmp.{os.getpid()}"
