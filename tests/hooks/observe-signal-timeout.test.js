@@ -143,15 +143,8 @@ test('_ecc_bail handlers keep exit code 0 (no exit 2 / block regression)', () =>
   });
 });
 
-test('real _ecc_bail handler: SIGALRM fire emits stderr token and exits 0', () => {
-  const python = findPython();
-  if (!python) {
-    console.log('  (skipped: no python interpreter available)');
-    return;
-  }
-
+function runHandlerTimeout(python, handler) {
   // Run the ACTUAL handler text extracted from observe.sh, forcing the alarm.
-  const handler = handlers[0];
   const program = [
     'import sys, signal, time',
     handler,
@@ -161,25 +154,42 @@ test('real _ecc_bail handler: SIGALRM fire emits stderr token and exits 0', () =
     'print("REACHED_END_SHOULD_NOT_HAPPEN")',
   ].join('\n');
 
-  const result = spawnSync(python.command, [...python.args, '-c', program], {
+  return spawnSync(python.command, [...python.args, '-c', program], {
     encoding: 'utf8',
     timeout: 15000,
   });
+}
 
-  assert.strictEqual(result.signal, null, `python killed by signal ${result.signal}`);
-  assert.strictEqual(result.status, 0, `expected exit 0 on timeout, got ${result.status}`);
-  assert.ok(
-    /\[observe\] SIGALRM timeout/.test(result.stderr),
-    `expected the [observe] SIGALRM timeout warning on stderr, got: ${JSON.stringify(result.stderr)}`
-  );
-  assert.ok(
-    !/REACHED_END_SHOULD_NOT_HAPPEN/.test(result.stdout),
-    'handler should have terminated before the post-sleep stdout write'
-  );
-  assert.ok(
-    !/\[observe\] SIGALRM timeout/.test(result.stdout),
-    'the warning must go to stderr, never stdout (stdout is the observations stream)'
-  );
+// Exercise EVERY handler end-to-end, not just handlers[0]. The main
+// observation-write path (handlers[1]) is the higher-value one to verify:
+// it carries valid, parseable data that would succeed given more time, so a
+// silent drop there is the worst case. A behavioral check on only the first
+// handler would not catch a regression that silenced the second one.
+handlers.forEach((handler, idx) => {
+  test(`real _ecc_bail handler #${idx + 1}: SIGALRM fire emits stderr token and exits 0`, () => {
+    const python = findPython();
+    if (!python) {
+      console.log('  (skipped: no python interpreter available)');
+      return;
+    }
+
+    const result = runHandlerTimeout(python, handler);
+
+    assert.strictEqual(result.signal, null, `python killed by signal ${result.signal}`);
+    assert.strictEqual(result.status, 0, `expected exit 0 on timeout, got ${result.status}`);
+    assert.ok(
+      /\[observe\] SIGALRM timeout/.test(result.stderr),
+      `expected the [observe] SIGALRM timeout warning on stderr, got: ${JSON.stringify(result.stderr)}`
+    );
+    assert.ok(
+      !/REACHED_END_SHOULD_NOT_HAPPEN/.test(result.stdout),
+      'handler should have terminated before the post-sleep stdout write'
+    );
+    assert.ok(
+      !/\[observe\] SIGALRM timeout/.test(result.stdout),
+      'the warning must go to stderr, never stdout (stdout is the observations stream)'
+    );
+  });
 });
 
 console.log(`\nPassed: ${passed}`);
