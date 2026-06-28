@@ -1246,6 +1246,15 @@ def test_projects_merge_missing_source(patch_globals, capsys):
     assert "Source project" in capsys.readouterr().err
 
 
+def test_projects_merge_missing_destination(patch_globals, capsys):
+    tree = patch_globals
+    # Source present, destination absent — exercises the symmetric error branch.
+    tree["registry_file"].write_text(json.dumps({"src": {"name": "s"}}))
+    args = SimpleNamespace(from_id="src", into_id="dest", dry_run=False, force=True)
+    assert _cmd_projects_merge(args) == 1
+    assert "Destination project" in capsys.readouterr().err
+
+
 def test_projects_merge_dry_run_no_changes(patch_globals, capsys):
     tree = patch_globals
     src = _make_project(tree, pid="src", pname="s")
@@ -1334,3 +1343,15 @@ def test_cmd_prune_quiet_suppresses_output(monkeypatch, tmp_path, capsys):
     captured = capsys.readouterr()
     assert captured.out == ""
     assert captured.err == ""
+
+
+def test_cmd_prune_empty_pending_nothing_to_do(monkeypatch, capsys):
+    # Nothing pending at all: the non-dry-run, non-quiet branch must report
+    # "nothing to do" (not "[DRY RUN]"), return 0, and not crash.
+    monkeypatch.setattr(_mod, "_collect_pending_instincts", lambda: [])
+
+    args = SimpleNamespace(max_age=30, dry_run=False, quiet=False)
+    assert cmd_prune(args) == 0
+    out = capsys.readouterr().out
+    assert "No pending instincts older than 30 days." in out
+    assert "[DRY RUN]" not in out
