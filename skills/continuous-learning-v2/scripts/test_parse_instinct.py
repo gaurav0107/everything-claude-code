@@ -1208,6 +1208,8 @@ def test_projects_gc_dry_run_keeps_entry(patch_globals, capsys):
     assert _cmd_projects_gc(args) == 0
     assert "[DRY RUN]" in capsys.readouterr().out
     assert "empty1" in json.loads(tree["registry_file"].read_text())
+    # dry-run must not touch storage on disk
+    assert (tree["projects_dir"] / "empty1").exists()
 
 
 def test_projects_gc_force_removes_only_zero_value(patch_globals, capsys):
@@ -1257,6 +1259,8 @@ def test_projects_merge_dry_run_no_changes(patch_globals, capsys):
     reg = json.loads(tree["registry_file"].read_text())
     assert "src" in reg and "dest" in reg
     assert (tree["projects_dir"] / "src").exists()
+    # dry-run must not copy any instinct into the destination storage
+    assert not list((tree["projects_dir"] / "dest" / "instincts" / "personal").glob("*.yaml"))
 
 
 def test_projects_merge_force_moves_and_removes_source(patch_globals, capsys):
@@ -1327,4 +1331,6 @@ def test_cmd_prune_quiet_suppresses_output(monkeypatch, tmp_path, capsys):
     args = SimpleNamespace(max_age=30, dry_run=False, quiet=True)
     assert cmd_prune(args) == 0
     assert not f_old.exists()
-    assert capsys.readouterr().out == ""
+    captured = capsys.readouterr()
+    assert captured.out == ""
+    assert captured.err == ""
