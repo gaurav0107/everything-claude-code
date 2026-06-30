@@ -94,6 +94,15 @@ function resolveInstalledTarget(target, sourceDir, index) {
   return null;
 }
 
+// True when the plan installs `sourceRel` at a different relative path than the
+// source (i.e. a namespace segment was injected, e.g. skills/x -> skills/ecc/x).
+// Callers use this to keep non-namespaced files on the byte-for-byte copy path.
+function isNamespacedSource(sourceRel, index) {
+  const normalizedSource = toPosix(sourceRel);
+  const installedSource = index && index.byFile.get(normalizedSource);
+  return Boolean(installedSource) && installedSource !== normalizedSource;
+}
+
 // Rewrite relative links in a single namespaced markdown file so they resolve
 // to the file's installed location. Returns the content unchanged when the
 // file itself was not namespaced or when no link needs adjustment. Pure: no IO.
@@ -165,5 +174,6 @@ function rewriteRelativeLinks(content, options) {
 
 module.exports = {
   buildInstallIndex,
+  isNamespacedSource,
   rewriteRelativeLinks,
 };

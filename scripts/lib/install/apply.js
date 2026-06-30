@@ -5,7 +5,7 @@ const path = require('path');
 
 const { writeInstallState } = require('../install-state');
 const { filterMcpConfig, parseDisabledMcpServers } = require('../mcp-config');
-const { buildInstallIndex, rewriteRelativeLinks } = require('./link-rewrite');
+const { buildInstallIndex, isNamespacedSource, rewriteRelativeLinks } = require('./link-rewrite');
 
 function isMarkdownPath(filePath) {
   return /\.(md|mdx|markdown)$/i.test(String(filePath || ''));
@@ -176,12 +176,14 @@ function applyInstallPlan(plan) {
 
     // Namespaced markdown (e.g. skills/<id> -> skills/ecc/<id>) needs its
     // relative cross-directory links rewritten so they resolve after install
-    // (issue #2340). Non-namespaced or non-markdown files are byte-copied.
+    // (issue #2340). Files whose install path is unchanged (no namespace
+    // injected) and all non-markdown files stay on the byte-for-byte copy path.
     if (
       linkIndex
       && operation.kind === 'copy-file'
       && operation.sourceRelativePath
       && isMarkdownPath(operation.destinationPath)
+      && isNamespacedSource(operation.sourceRelativePath, linkIndex)
     ) {
       const rewritten = rewriteRelativeLinks(
         fs.readFileSync(operation.sourcePath, 'utf8'),
