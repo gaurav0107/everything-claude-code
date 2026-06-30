@@ -23,11 +23,11 @@ let failed = 0;
 function test(name, fn) {
   try {
     fn();
-    console.log(`  ✓ ${name}`);
+    process.stdout.write(`  ✓ ${name}\n`);
     passed++;
   } catch (err) {
-    console.log(`  ✗ ${name}`);
-    console.log(`    Error: ${err.message}`);
+    process.stderr.write(`  ✗ ${name}\n`);
+    process.stderr.write(`    ${err && err.stack ? err.stack : String(err)}\n`);
     failed++;
   }
 }
@@ -50,7 +50,7 @@ function collectShellScripts(dir, acc = []) {
 }
 
 function firstLine(filePath) {
-  return fs.readFileSync(filePath, 'utf8').split('\n', 1)[0];
+  return fs.readFileSync(filePath, 'utf8').split(/\r?\n/, 1)[0];
 }
 
 console.log('\n=== continuous-learning-v2 shebang consistency ===\n');
