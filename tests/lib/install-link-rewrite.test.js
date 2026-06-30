@@ -46,6 +46,8 @@ function test(name, fn) {
   } catch (error) {
     console.log(`  FAIL ${name}`);
     console.log(`    Error: ${error.message}`);
+    // Preserve the full stack (source line + assertion diff) for diagnosis.
+    console.error(error.stack || error);
     return false;
   }
 }
