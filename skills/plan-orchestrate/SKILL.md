@@ -103,7 +103,7 @@ A misspelled agent name fails `/orchestrate`. Cross-check against this list befo
    - No marker matched → set `lang=unknown`.
    - `lang=unknown` is a sentinel — it is **not** an agent name. Phase 2 rules 4 and 5 turn it into `code-reviewer` / `build-error-resolver` at chain composition time.
 4. Detect a **PyTorch sub-profile**: when `lang=python` and any of `pyproject.toml` / `requirements.txt` / `uv.lock` declares a dependency on `torch`, set `pytorch=true`. This only affects `build` chain selection (Phase 2 rule below); the reviewer remains `python-reviewer`.
-5. **Normalize any agent names declared in the plan**: if the plan text references agents by a plugin-prefixed form (e.g. `ecc:tdd-guide` or `everything-claude-code:tdd-guide`), strip the `{NS}:` prefix to get the bare catalogue name before validating or composing chains. Re-prefixing happens only at output time per `ECC_MODE` (Phase 4). Never let a pre-prefixed name flow into chain composition — it would double-prefix in plugin mode.
+5. **Normalize any agent names declared in the plan**: if the plan text references agents by a plugin-prefixed form (e.g. `ecc:tdd-guide` or `everything-claude-code:tdd-guide`), strip any known plugin prefix (`ecc:` or `everything-claude-code:`) — not only the currently detected `{NS}:` — to get the bare catalogue name before validating or composing chains. A plan written under one install can be run under another, so a stale prefix that differs from `{NS}` must still be normalized. Re-prefixing happens only at output time per `ECC_MODE` (Phase 4). Never let a pre-prefixed name flow into chain composition — it would double-prefix in plugin mode.
 
 ### Phase 1 — Decompose steps
 

@@ -69,6 +69,35 @@ test('prefers the ecc marketplace over the legacy id (ordering)', () => {
   );
 });
 
+test('the Phase 0 detection algorithm itself checks ecc before the legacy marketplace', () => {
+  // Scope the ordering assertion to the actual detection algorithm so a
+  // future edit cannot regress the algorithm order while the table/examples
+  // keep the whole-document check above green.
+  const start = skill.indexOf('Detect ECC install form once and freeze');
+  assert.ok(start !== -1, 'Expected the Phase 0 detection algorithm block to be present');
+  const after = skill.indexOf('From this point on', start);
+  const algo = skill.slice(start, after === -1 ? undefined : after);
+  const eccIdx = algo.indexOf('marketplaces/ecc/');
+  const legacyIdx = algo.indexOf('marketplaces/everything-claude-code/');
+  assert.ok(
+    eccIdx !== -1 && legacyIdx !== -1,
+    'Expected the detection algorithm to check both marketplace paths'
+  );
+  assert.ok(
+    eccIdx < legacyIdx,
+    'Expected the detection algorithm to match marketplaces/ecc/ before marketplaces/everything-claude-code/'
+  );
+});
+
+test('plan-declared agent normalization strips either known plugin prefix', () => {
+  assert.ok(
+    skill.includes('ecc:tdd-guide') &&
+      skill.includes('everything-claude-code:tdd-guide') &&
+      skill.includes('strip any known plugin prefix'),
+    'Expected Phase 0 step 5 to normalize both ecc: and everything-claude-code: prefixes before catalogue validation'
+  );
+});
+
 test('still documents the legacy bare install and its fallback warning', () => {
   assert.ok(
     skill.includes('Legacy bare install'),
