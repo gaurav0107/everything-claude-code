@@ -41,6 +41,12 @@ function collectShellScripts(dir, acc = []) {
   for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
     const fullPath = path.join(dir, entry.name);
     if (entry.isDirectory()) {
+      // Skip hidden/runtime directories (e.g. the observer's `.observer-tmp`)
+      // so an untracked local artifact cannot trigger a false failure; only
+      // committed skill scripts are checked.
+      if (entry.name.startsWith('.')) {
+        continue;
+      }
       collectShellScripts(fullPath, acc);
     } else if (entry.isFile() && entry.name.endsWith('.sh')) {
       acc.push(fullPath);
