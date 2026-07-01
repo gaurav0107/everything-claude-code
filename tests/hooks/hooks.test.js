@@ -537,6 +537,11 @@ async function runTests() {
         const garbage = await runScript(path.join(scriptsDir, 'session-start.js'), '', { ...baseEnv, ECC_MAX_INJECTED_INSTINCTS: 'not-a-number' });
         assert.strictEqual(garbage.code, 0);
         assert.ok(garbage.stderr.includes('Injecting 6 instinct(s)'), `garbage override should fall back to default 6, stderr: ${garbage.stderr}`);
+
+        // A partial/non-integer value must be rejected whole, not truncated.
+        const partial = await runScript(path.join(scriptsDir, 'session-start.js'), '', { ...baseEnv, ECC_MAX_INJECTED_INSTINCTS: '3.9' });
+        assert.strictEqual(partial.code, 0);
+        assert.ok(partial.stderr.includes('Injecting 6 instinct(s)'), `non-integer override (3.9) should fall back to default 6, not truncate to 3, stderr: ${partial.stderr}`);
       } finally {
         fs.rmSync(isoHome, { recursive: true, force: true });
       }

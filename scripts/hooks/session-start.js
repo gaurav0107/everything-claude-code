@@ -128,7 +128,13 @@ function getInstinctConfidenceThreshold() {
   const raw = process.env.ECC_INSTINCT_CONFIDENCE_THRESHOLD;
   if (!raw) return DEFAULT_INSTINCT_CONFIDENCE_THRESHOLD;
 
-  const parsed = Number.parseFloat(raw);
+  // Use Number() (not parseFloat) so a malformed value like "0.7x" or
+  // "0.7 " with trailing junk is rejected whole rather than silently
+  // accepting the numeric prefix.
+  const normalized = raw.trim();
+  if (!normalized) return DEFAULT_INSTINCT_CONFIDENCE_THRESHOLD;
+
+  const parsed = Number(normalized);
   return Number.isFinite(parsed) && parsed >= 0 && parsed <= 1
     ? parsed
     : DEFAULT_INSTINCT_CONFIDENCE_THRESHOLD;
@@ -146,7 +152,13 @@ function getMaxInjectedInstincts() {
   const raw = process.env.ECC_MAX_INJECTED_INSTINCTS;
   if (!raw) return DEFAULT_MAX_INJECTED_INSTINCTS;
 
-  const parsed = Number.parseInt(raw, 10);
+  // Use Number() (not parseInt) so a non-integer or partial value like
+  // "3.9" or "6abc" is rejected whole and falls back to the default,
+  // rather than parseInt silently truncating to 3 / 6.
+  const normalized = raw.trim();
+  if (!normalized) return DEFAULT_MAX_INJECTED_INSTINCTS;
+
+  const parsed = Number(normalized);
   return Number.isInteger(parsed) && parsed > 0 ? parsed : DEFAULT_MAX_INJECTED_INSTINCTS;
 }
 
