@@ -542,6 +542,13 @@ async function runTests() {
         const partial = await runScript(path.join(scriptsDir, 'session-start.js'), '', { ...baseEnv, ECC_MAX_INJECTED_INSTINCTS: '3.9' });
         assert.strictEqual(partial.code, 0);
         assert.ok(partial.stderr.includes('Injecting 6 instinct(s)'), `non-integer override (3.9) should fall back to default 6, not truncate to 3, stderr: ${partial.stderr}`);
+
+        // Non-decimal numeric syntax (exponent, hex) must be rejected too.
+        // If "1e2" were accepted as 100, all 8 fixtures would inject; the
+        // default cap of 6 proves it fell back.
+        const exponent = await runScript(path.join(scriptsDir, 'session-start.js'), '', { ...baseEnv, ECC_MAX_INJECTED_INSTINCTS: '1e2' });
+        assert.strictEqual(exponent.code, 0);
+        assert.ok(exponent.stderr.includes('Injecting 6 instinct(s)'), `exponent override (1e2) should fall back to default 6, stderr: ${exponent.stderr}`);
       } finally {
         fs.rmSync(isoHome, { recursive: true, force: true });
       }
@@ -578,6 +585,13 @@ async function runTests() {
         const lowered = await runScript(path.join(scriptsDir, 'session-start.js'), '', { ...baseEnv, ECC_INSTINCT_CONFIDENCE_THRESHOLD: '0.5' });
         assert.strictEqual(lowered.code, 0);
         assert.ok(lowered.stderr.includes('Injecting 6 instinct(s)'), `0.5 threshold should pass all eight but cap at the default 6, stderr: ${lowered.stderr}`);
+
+        // Non-decimal syntax must fall back to the default 0.7, not be read
+        // as hex. If "0x1" were accepted as 1.0, zero instincts would inject
+        // (none are at full confidence); the default 0.7 injects the four 0.9s.
+        const hex = await runScript(path.join(scriptsDir, 'session-start.js'), '', { ...baseEnv, ECC_INSTINCT_CONFIDENCE_THRESHOLD: '0x1' });
+        assert.strictEqual(hex.code, 0);
+        assert.ok(hex.stderr.includes('Injecting 4 instinct(s)'), `hex threshold (0x1) should fall back to the 0.7 default and inject the four 0.9 instincts, stderr: ${hex.stderr}`);
       } finally {
         fs.rmSync(isoHome, { recursive: true, force: true });
       }
