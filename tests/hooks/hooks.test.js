@@ -512,6 +512,76 @@ async function runTests() {
   else failed++;
 
   if (
+    await asyncTest('honors ECC_MAX_INJECTED_INSTINCTS for injected instincts', async () => {
+      const isoHome = path.join(os.tmpdir(), `ecc-max-instincts-${Date.now()}`);
+      const homunculusDir = path.join(isoHome, 'homunculus');
+      const instinctsDir = path.join(homunculusDir, 'instincts', 'personal');
+      fs.mkdirSync(instinctsDir, { recursive: true });
+      for (let i = 1; i <= 8; i++) {
+        fs.writeFileSync(
+          path.join(instinctsDir, `instinct-${i}.md`),
+          `---\nid: max-instinct-${i}\nconfidence: 0.9\n---\n## Action\nDo configurable thing number ${i}.\n`
+        );
+      }
+      const baseEnv = { HOME: isoHome, USERPROFILE: isoHome, CLV2_HOMUNCULUS_DIR: homunculusDir };
+
+      try {
+        const def = await runScript(path.join(scriptsDir, 'session-start.js'), '', baseEnv);
+        assert.strictEqual(def.code, 0);
+        assert.ok(def.stderr.includes('Injecting 6 instinct(s)'), `default cap should inject 6, stderr: ${def.stderr}`);
+
+        const capped = await runScript(path.join(scriptsDir, 'session-start.js'), '', { ...baseEnv, ECC_MAX_INJECTED_INSTINCTS: '3' });
+        assert.strictEqual(capped.code, 0);
+        assert.ok(capped.stderr.includes('Injecting 3 instinct(s)'), `override should inject 3, stderr: ${capped.stderr}`);
+
+        const garbage = await runScript(path.join(scriptsDir, 'session-start.js'), '', { ...baseEnv, ECC_MAX_INJECTED_INSTINCTS: 'not-a-number' });
+        assert.strictEqual(garbage.code, 0);
+        assert.ok(garbage.stderr.includes('Injecting 6 instinct(s)'), `garbage override should fall back to default 6, stderr: ${garbage.stderr}`);
+      } finally {
+        fs.rmSync(isoHome, { recursive: true, force: true });
+      }
+    })
+  )
+    passed++;
+  else failed++;
+
+  if (
+    await asyncTest('honors ECC_INSTINCT_CONFIDENCE_THRESHOLD for injected instincts', async () => {
+      const isoHome = path.join(os.tmpdir(), `ecc-instinct-threshold-${Date.now()}`);
+      const homunculusDir = path.join(isoHome, 'homunculus');
+      const instinctsDir = path.join(homunculusDir, 'instincts', 'personal');
+      fs.mkdirSync(instinctsDir, { recursive: true });
+      // 4 high-confidence (0.9) + 4 low-confidence (0.6) instincts.
+      for (let i = 1; i <= 8; i++) {
+        const confidence = i <= 4 ? '0.9' : '0.6';
+        fs.writeFileSync(
+          path.join(instinctsDir, `instinct-${i}.md`),
+          `---\nid: thr-instinct-${i}\nconfidence: ${confidence}\n---\n## Action\nDo threshold thing number ${i}.\n`
+        );
+      }
+      const baseEnv = { HOME: isoHome, USERPROFILE: isoHome, CLV2_HOMUNCULUS_DIR: homunculusDir };
+
+      try {
+        const def = await runScript(path.join(scriptsDir, 'session-start.js'), '', baseEnv);
+        assert.strictEqual(def.code, 0);
+        assert.ok(def.stderr.includes('Injecting 4 instinct(s)'), `default 0.7 threshold should inject only the four 0.9 instincts, stderr: ${def.stderr}`);
+
+        const raised = await runScript(path.join(scriptsDir, 'session-start.js'), '', { ...baseEnv, ECC_INSTINCT_CONFIDENCE_THRESHOLD: '0.95' });
+        assert.strictEqual(raised.code, 0);
+        assert.ok(!raised.stderr.includes('instinct(s) into session context'), `0.95 threshold should filter out all instincts, stderr: ${raised.stderr}`);
+
+        const lowered = await runScript(path.join(scriptsDir, 'session-start.js'), '', { ...baseEnv, ECC_INSTINCT_CONFIDENCE_THRESHOLD: '0.5' });
+        assert.strictEqual(lowered.code, 0);
+        assert.ok(lowered.stderr.includes('Injecting 6 instinct(s)'), `0.5 threshold should pass all eight but cap at the default 6, stderr: ${lowered.stderr}`);
+      } finally {
+        fs.rmSync(isoHome, { recursive: true, force: true });
+      }
+    })
+  )
+    passed++;
+  else failed++;
+
+  if (
     await asyncTest('disables session-start additional context when requested', async () => {
       const isoHome = path.join(os.tmpdir(), `ecc-disabled-start-${Date.now()}`);
       const sessionsDir = getLegacySessionsDir(isoHome);
