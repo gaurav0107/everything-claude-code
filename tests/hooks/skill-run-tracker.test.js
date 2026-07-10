@@ -183,5 +183,50 @@ if (test('never throws or blocks on malformed / empty stdin', () => {
   }
 })) passed++; else failed++;
 
+// deriveOutcome has four failure-detection paths on the tool response; cover
+// the variants beyond the is_error boolean already exercised above.
+const FAILURE_RESPONSE_VARIANTS = [
+  ['tool_output alternative to tool_response', { tool_output: { is_error: true } }],
+  ['isError camelCase variant', { tool_response: { isError: true } }],
+  ['status string matching /error|fail/', { tool_response: { status: 'error' } }],
+  ['non-empty error field', { tool_response: { error: 'kaboom' } }],
+];
+
+for (const [label, extra] of FAILURE_RESPONSE_VARIANTS) {
+  if (test(`records outcome "failure" via ${label}`, () => {
+    const home = createTempHome();
+    try {
+      const input = JSON.stringify({
+        tool_name: 'Skill',
+        tool_input: { skill_id: 'variant-skill' },
+        ...extra,
+      });
+      const result = runHook(home, input);
+      assert.strictEqual(result.status, 0);
+      const records = readRecords(home);
+      assert.strictEqual(records.length, 1);
+      assert.strictEqual(records[0].outcome, 'failure');
+    } finally {
+      fs.rmSync(home, { recursive: true, force: true });
+    }
+  })) passed++; else failed++;
+}
+
+if (test('hooks.json registers post:skill:track on both PostToolUse and PostToolUseFailure', () => {
+  const hooksJson = JSON.parse(
+    fs.readFileSync(path.join(__dirname, '..', '..', 'hooks', 'hooks.json'), 'utf8')
+  );
+  for (const event of ['PostToolUse', 'PostToolUseFailure']) {
+    const entries = (hooksJson.hooks[event] || []).filter(
+      e => e.id === 'post:skill:track' && e.matcher === 'Skill'
+    );
+    assert.strictEqual(entries.length, 1, `expected one Skill entry under ${event}`);
+    assert.ok(
+      entries[0].hooks[0].command.includes('scripts/hooks/skill-run-tracker.js'),
+      `${event} entry should invoke skill-run-tracker.js`
+    );
+  }
+})) passed++; else failed++;
+
 console.log(`\nResults: Passed: ${passed}, Failed: ${failed}`);
 process.exit(failed > 0 ? 1 : 0);

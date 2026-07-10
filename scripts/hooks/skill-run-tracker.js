@@ -127,6 +127,21 @@ function run(rawInput) {
   return passthrough(rawInput);
 }
 
+// Write stdout fully before exiting. Calling process.exit() immediately after
+// process.stdout.write() can drop anything beyond the OS pipe buffer (~64KB),
+// cutting a large pass-through payload mid-JSON — the #2222 pattern that
+// run-with-flags.js guards against via exitWithStdout. The write callback fires
+// only after the chunk is flushed. Production goes through run-with-flags.js
+// (which flushes properly); this guards the direct-CLI and test paths.
+function exitWithStdout(text, exitCode) {
+  const out = typeof text === 'string' ? text : String(text ?? '');
+  if (out.length === 0) {
+    process.exit(exitCode);
+    return;
+  }
+  process.stdout.write(out, () => process.exit(exitCode));
+}
+
 if (require.main === module) {
   let raw = '';
   process.stdin.setEncoding('utf8');
@@ -135,14 +150,8 @@ if (require.main === module) {
       raw += chunk.substring(0, MAX_STDIN - raw.length);
     }
   });
-  process.stdin.on('end', () => {
-    process.stdout.write(run(raw));
-    process.exit(0);
-  });
-  process.stdin.on('error', () => {
-    process.stdout.write(raw);
-    process.exit(0);
-  });
+  process.stdin.on('end', () => exitWithStdout(run(raw), 0));
+  process.stdin.on('error', () => exitWithStdout(raw, 0));
 }
 
 module.exports = { run };
