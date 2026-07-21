@@ -212,20 +212,36 @@ for (const [label, extra] of FAILURE_RESPONSE_VARIANTS) {
   })) passed++; else failed++;
 }
 
-if (test('hooks.json registers post:skill:track on both PostToolUse and PostToolUseFailure', () => {
+// PostToolUse is fanned out through posttooluse-dispatcher.js (one sync + one
+// async entry in hooks.json), so the tracker registers in the dispatcher's
+// SYNC_HOOKS registry rather than as its own hooks.json entry. PostToolUseFailure
+// is not dispatcher-ized, so it stays a direct entry.
+if (test('post:skill:track is registered in the PostToolUse dispatcher SYNC registry', () => {
+  const { SYNC_HOOKS, ASYNC_HOOKS } = require('../../scripts/hooks/posttooluse-dispatcher');
+  const entries = SYNC_HOOKS.filter(h => h.id === 'post:skill:track');
+  assert.strictEqual(entries.length, 1, 'expected exactly one post:skill:track in SYNC_HOOKS');
+  assert.strictEqual(entries[0].matcher, 'Skill', 'tracker should only match the Skill tool');
+  assert.strictEqual(entries[0].script, 'scripts/hooks/skill-run-tracker.js');
+  assert.strictEqual(typeof entries[0].run, 'function', 'registry entry must carry a run()');
+  assert.strictEqual(
+    ASYNC_HOOKS.filter(h => h.id === 'post:skill:track').length,
+    0,
+    'tracker must not be double-registered in ASYNC_HOOKS'
+  );
+})) passed++; else failed++;
+
+if (test('hooks.json registers post:skill:track under PostToolUseFailure', () => {
   const hooksJson = JSON.parse(
     fs.readFileSync(path.join(__dirname, '..', '..', 'hooks', 'hooks.json'), 'utf8')
   );
-  for (const event of ['PostToolUse', 'PostToolUseFailure']) {
-    const entries = (hooksJson.hooks[event] || []).filter(
-      e => e.id === 'post:skill:track' && e.matcher === 'Skill'
-    );
-    assert.strictEqual(entries.length, 1, `expected one Skill entry under ${event}`);
-    assert.ok(
-      entries[0].hooks[0].command.includes('scripts/hooks/skill-run-tracker.js'),
-      `${event} entry should invoke skill-run-tracker.js`
-    );
-  }
+  const entries = (hooksJson.hooks.PostToolUseFailure || []).filter(
+    e => e.id === 'post:skill:track' && e.matcher === 'Skill'
+  );
+  assert.strictEqual(entries.length, 1, 'expected one Skill entry under PostToolUseFailure');
+  assert.ok(
+    entries[0].hooks[0].command.includes('scripts/hooks/skill-run-tracker.js'),
+    'PostToolUseFailure entry should invoke skill-run-tracker.js'
+  );
 })) passed++; else failed++;
 
 console.log(`\nResults: Passed: ${passed}, Failed: ${failed}`);
