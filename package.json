@@ -46,6 +46,7 @@
     ".codex-plugin/",
     ".cursor/",
     ".gemini/",
+    ".github/PULL_REQUEST_TEMPLATE.md",
     ".hermes/",
     ".kimi/",
     ".opencode/",
@@ -54,13 +55,18 @@
     ".zed/",
     ".mcp.json",
     "AGENTS.md",
+    "COMMANDS-QUICK-REF.md",
+    "CONTRIBUTING.md",
     "VERSION",
     "agent.yaml",
     "assets/ecc-icon.svg",
     "assets/hero.png",
+    "assets/images/sponsors/",
     "agents/",
     "commands/",
     "docs/de-DE/",
+    "docs/CODEX-NAVIGATION-GUIDE.md",
+    "docs/COMMAND-AGENT-MAP.md",
     "docs/ja-JP/",
     "docs/ko-KR/",
     "docs/pt-BR/",
@@ -117,6 +123,7 @@
     "scripts/setup-package-manager.js",
     "scripts/skill-create-output.js",
     "scripts/status.js",
+    "scripts/sync-ecc-to-codex.sh",
     "scripts/work-items.js",
     "scripts/uninstall.js",
     "skills/agent-architecture-audit/",
@@ -410,7 +417,7 @@
     "ecc-plan-canvas": "scripts/plan-canvas.js"
   },
   "scripts": {
-    "welcome": "echo '\\n  ecc-universal installed!\\n  Run: ecc typescript\\n  Compat: ecc-install typescript\\n  Docs: https://github.com/affaan-m/ECC\\n'",
+    "welcome": "echo '\\n  ecc-universal installed!\\n  Run: ecc typescript\\n  Compat: ecc-install typescript\\n  Docs: https://github.com/affaan-m/ECC\\n  Run or self-host any open-source model.\\n  Compute: Itô is the preferred compute sponsor — https://compute.itomarkets.com\\n  Any GPU provider works; ECC only links to the dashboard and does not provision compute or serving.\\n  Managed inference through Itô is not live yet.\\n'",
     "catalog:check": "node scripts/ci/catalog.js --text",
     "catalog:sync": "node scripts/ci/catalog.js --write --text",
     "command-registry:generate": "node scripts/ci/generate-command-registry.js",
@@ -459,12 +466,14 @@
     "node": ">=18"
   },
   "overrides": {
-    "markdown-it": ">=14.2.0",
-    "js-yaml": ">=4.2.0"
+    "fast-uri": "3.1.4",
+    "markdown-it": "14.3.0",
+    "js-yaml": "4.3.0"
   },
   "resolutions": {
-    "markdown-it": ">=14.2.0",
-    "js-yaml": ">=4.2.0"
+    "fast-uri": "3.1.4",
+    "markdown-it": "14.3.0",
+    "js-yaml": "4.3.0"
   },
   "packageManager": "yarn@4.9.2+sha512.1fc009bc09d13cfd0e19efa44cbfc2b9cf6ca61482725eb35bbc5e257e093ebf4130db6dfe15d604ff4b79efd8e1e8e99b25fa7d0a6197c9f9826358d4d65c3c"
 }
