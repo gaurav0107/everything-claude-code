@@ -250,6 +250,21 @@ test('claude marketplace.json plugin version matches package.json', () => {
   assert.strictEqual(claudeMarketplace.plugins[0].version, expectedVersion);
 });
 
+test('claude marketplace.json plugin source is a remote-sync object, not a string (#2542)', () => {
+  // Claude Cowork's REMOTE marketplace sync (server-side clone) rejects string
+  // sources such as "./" with:
+  //   External plugin sources must be objects with a 'source' field
+  //   (github, url, or git-subdir).
+  // Local `/plugin marketplace add` tolerates the string shorthand, which is why
+  // the CLI succeeds while Cowork fails. Keep the object form so remote sync works.
+  const src = claudeMarketplace.plugins[0].source;
+  assert.ok(src && typeof src === 'object' && !Array.isArray(src), `Expected plugins[0].source to be an object, got: ${JSON.stringify(src)}`);
+  assert.ok(['github', 'url', 'git-subdir'].includes(src.source), `Expected source.source to be github|url|git-subdir, got: ${JSON.stringify(src.source)}`);
+  if (src.source === 'github') {
+    assert.strictEqual(src.repo, 'affaan-m/ECC', 'Expected github source.repo to match this repository');
+  }
+});
+
 // ── Codex plugin manifest ─────────────────────────────────────────────────────
 // Per official docs: https://platform.openai.com/docs/codex/plugins
 // - .codex-plugin/plugin.json is the required manifest
